@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 
 	"github.com/Valdeci97/fullcycle-event/domain"
 )
@@ -12,6 +13,18 @@ type TransctionRepositoryDb struct {
 
 func NewTransactionRepositoryDb(db *sql.DB) *TransctionRepositoryDb {
 	return &TransctionRepositoryDb{}
+}
+
+func (t *TransctionRepositoryDb) GetCreditCard(creditCard domain.CreditCard) (domain.CreditCard, error) {
+	var card domain.CreditCard
+	stmt, err := t.db.Prepare("select id, balance, balance_limit from credit_cards where number = $1")
+	if err != nil {
+		return card, err
+	}
+	if err = stmt.QueryRow(creditCard.Number).Scan(&card.ID, &card.Balance, &card.Limit); err != nil {
+		return card, errors.New("credit card does not exist")
+	}
+	return card, nil
 }
 
 func (t *TransctionRepositoryDb) Save(
