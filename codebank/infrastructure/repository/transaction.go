@@ -7,34 +7,17 @@ import (
 	"github.com/Valdeci97/fullcycle-event/domain"
 )
 
-type TransctionRepositoryDb struct {
+type TransactionRepositoryDb struct {
 	db *sql.DB
 }
 
-func NewTransactionRepositoryDb(db *sql.DB) *TransctionRepositoryDb {
-	return &TransctionRepositoryDb{}
+func NewTransactionRepositoryDb(db *sql.DB) *TransactionRepositoryDb {
+	return &TransactionRepositoryDb{db: db}
 }
 
-func (t *TransctionRepositoryDb) GetCreditCard(creditCard domain.CreditCard) (domain.CreditCard, error) {
-	var card domain.CreditCard
-	stmt, err := t.db.Prepare("select id, balance, balance_limit from credit_cards where number = $1")
-	if err != nil {
-		return card, err
-	}
-	if err = stmt.QueryRow(creditCard.Number).Scan(&card.ID, &card.Balance, &card.Limit); err != nil {
-		return card, errors.New("credit card does not exist")
-	}
-	return card, nil
-}
-
-func (t *TransctionRepositoryDb) Save(
-	transaction *domain.Transaction,
-	card domain.CreditCard,
-) error {
-	stmt, err := t.db.Prepare(`
-		insert into transactions (id, credit_card, amount, status, description, store, created_at)
-		values ($1, $2, $3, $4, $5, $6, $7)
-	`)
+func (t *TransactionRepositoryDb) SaveTransaction(transaction domain.Transaction, creditCard domain.CreditCard) error {
+	stmt, err := t.db.Prepare(`insert into transactions(id, credit_card_id, amount, status, description, store, created_at)
+								values($1, $2, $3, $4, $5, $6, $7)`)
 	if err != nil {
 		return err
 	}
@@ -51,7 +34,7 @@ func (t *TransctionRepositoryDb) Save(
 		return err
 	}
 	if transaction.Status == "Approved" {
-		err = t.UpdateBalance(card)
+		err = t.updateBalance(creditCard)
 		if err != nil {
 			return err
 		}
@@ -63,46 +46,49 @@ func (t *TransctionRepositoryDb) Save(
 	return nil
 }
 
-func (t *TransctionRepositoryDb) UpdateBalance(card domain.CreditCard) error {
-	_, err := t.db.Exec("update balances set balance = $1 where id = $2", card.Balance, card.ID)
+func (t *TransactionRepositoryDb) updateBalance(creditCard domain.CreditCard) error {
+	_, err := t.db.Exec("update credit_cards set balance = $1 where id = $2",
+		creditCard.Balance, creditCard.ID)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (t *TransctionRepositoryDb) CreateCreditCard(card domain.CreditCard) error {
-	stmt, err := t.db.Prepare(`
-		inser into credit_cards (
-			id,
-			name,
-			number,
-			expiration_month,
-			expiration_year,
-			cvv,
-			balance,
-			balance_limit
-		) values ($1, $2, $3, $4, $5, $6, $7, $8
-	`)
+func (t *TransactionRepositoryDb) CreateCreditCard(creditCard domain.CreditCard) error {
+	stmt, err := t.db.Prepare(`insert into credit_cards(id, name, number, expiration_month,expiration_year, CVV,balance, balance_limit) 
+								values($1,$2,$3,$4,$5,$6,$7,$8)`)
 	if err != nil {
 		return err
 	}
 	_, err = stmt.Exec(
-		card.ID,
-		card.Name,
-		card.Number,
-		card.ExpirationMonth,
-		card.ExpirationYear,
-		card.CVV,
-		card.Balance,
-		card.Limit,
+		creditCard.ID,
+		creditCard.Name,
+		creditCard.Number,
+		creditCard.ExpirationMonth,
+		creditCard.ExpirationYear,
+		creditCard.CVV,
+		creditCard.Balance,
+		creditCard.Limit,
 	)
 	if err != nil {
 		return err
 	}
 	err = stmt.Close()
 	if err != nil {
-		return nil
+		return err
 	}
 	return nil
+}
+
+func (t *TransactionRepositoryDb) GetCreditCard(creditCard domain.CreditCard) (domain.CreditCard, error) {
+	var c domain.CreditCard
+	stmt, err := t.db.Prepare("select id, balance, balance_limit from credit_cards where number=$1")
+	if err != nil {
+		return c, err
+	}
+	if err = stmt.QueryRow(creditCard.Number).Scan(&c.ID, &c.Balance, &c.Limit); err != nil {
+		return c, errors.New("credit card does not exists")
+	}
+	return c, nil
 }

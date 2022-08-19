@@ -7,7 +7,7 @@ import (
 )
 
 type TransactionRepository interface {
-	Save(transaction Transaction, card CreditCard) error
+	SaveTransaction(transaction Transaction, card CreditCard) error
 	GetCreditCard(card CreditCard) (CreditCard, error)
 	CreateCreditCard(card CreditCard) error
 }
